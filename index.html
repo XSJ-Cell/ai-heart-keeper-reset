@@ -1,0 +1,653 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="robots" content="noindex, nofollow" />
+    <title>重置密码 · 心意管家</title>
+    <!--
+      公网静态重置页（C1-03 修复）。
+      页面只与 Supabase Auth 通信，不加载任何第三方资源；
+      Supabase 地址与匿名 key 由 tools/deploy-reset-page.js 在部署时注入。
+    -->
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; connect-src https://vcrhtxtjnjewmcfgeyny.supabase.co; base-uri 'none'; form-action 'none'"
+    />
+    <style>
+      :root {
+        --page: #e6ebe3;
+        --paper: #fbfcf8;
+        --ink: #223a33;
+        --ink-soft: #52665d;
+        --ink-faint: #65776e;
+        --celadon: #9db9a8;
+        --celadon-deep: #6e8f7d;
+        --celadon-mist: rgba(157, 185, 168, 0.18);
+        --seal: #b4503c;
+        --seal-soft: rgba(180, 80, 60, 0.12);
+        --line: rgba(34, 58, 51, 0.14);
+        --radius: 18px;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        margin: 0;
+        min-height: 100%;
+      }
+
+      body {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 24px 18px;
+        background:
+          radial-gradient(circle at 18% 12%, rgba(157, 185, 168, 0.35), transparent 42%),
+          radial-gradient(circle at 82% 88%, rgba(229, 164, 94, 0.18), transparent 40%),
+          var(--page);
+        color: var(--ink);
+        font-family: "Noto Sans SC", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+        -webkit-font-smoothing: antialiased;
+      }
+
+      main {
+        width: 100%;
+        max-width: 420px;
+      }
+
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 18px;
+        padding-left: 6px;
+        color: var(--ink-soft);
+        font-size: 13px;
+        letter-spacing: 0.22em;
+      }
+
+      .seal {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 32px;
+        height: 32px;
+        border: 1px solid rgba(180, 80, 60, 0.55);
+        border-radius: 9px;
+        color: var(--seal);
+        font-size: 15px;
+        letter-spacing: 0;
+        transform: rotate(-3deg);
+      }
+
+      .card {
+        padding: 28px 24px 26px;
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        background: var(--paper);
+        box-shadow: 0 18px 42px rgba(34, 58, 51, 0.1);
+      }
+
+      h1 {
+        margin: 0 0 8px;
+        font-family: "Kaiti SC", "STKaiti", "KaiTi", serif;
+        font-size: 28px;
+        font-weight: 600;
+        line-height: 1.3;
+      }
+
+      .lead {
+        margin: 0 0 22px;
+        color: var(--ink-soft);
+        font-size: 15px;
+        line-height: 1.7;
+      }
+
+      .field + .field {
+        margin-top: 16px;
+      }
+
+      label {
+        display: block;
+        margin-bottom: 7px;
+        color: var(--ink-soft);
+        font-size: 13px;
+        letter-spacing: 0.04em;
+      }
+
+      .input-wrap {
+        position: relative;
+      }
+
+      input {
+        width: 100%;
+        padding: 13px 46px 13px 14px;
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        background: #fff;
+        color: var(--ink);
+        font: inherit;
+        font-size: 16px;
+        outline: none;
+        transition: border-color 0.15s ease, box-shadow 0.15s ease;
+      }
+
+      input:focus {
+        border-color: var(--celadon-deep);
+        box-shadow: 0 0 0 3px var(--celadon-mist);
+      }
+
+      input[aria-invalid="true"] {
+        border-color: var(--seal);
+        box-shadow: 0 0 0 3px var(--seal-soft);
+      }
+
+      .toggle {
+        position: absolute;
+        top: 50%;
+        right: 8px;
+        padding: 6px 8px;
+        border: 0;
+        border-radius: 8px;
+        background: transparent;
+        color: var(--celadon-deep);
+        font: inherit;
+        font-size: 12px;
+        cursor: pointer;
+      }
+
+      .toggle:focus-visible {
+        outline: 2px solid var(--celadon-deep);
+        outline-offset: 2px;
+      }
+
+      .hint {
+        margin: 8px 0 0;
+        color: var(--ink-faint);
+        font-size: 12px;
+        line-height: 1.6;
+      }
+
+      .error {
+        display: none;
+        margin-bottom: 18px;
+        padding: 12px 14px;
+        border: 1px solid rgba(180, 80, 60, 0.32);
+        border-radius: 12px;
+        background: var(--seal-soft);
+        color: var(--seal);
+        font-size: 14px;
+        line-height: 1.65;
+      }
+
+      .error.is-visible {
+        display: block;
+      }
+
+      .actions {
+        margin-top: 22px;
+      }
+
+      button.primary {
+        width: 100%;
+        padding: 14px 18px;
+        border: 0;
+        border-radius: 12px;
+        background: var(--celadon-deep);
+        color: #fff;
+        font: inherit;
+        font-size: 16px;
+        font-weight: 600;
+        letter-spacing: 0.06em;
+        cursor: pointer;
+        transition: filter 0.15s ease;
+      }
+
+      button.primary:hover {
+        filter: brightness(0.95);
+      }
+
+      button.primary:disabled {
+        cursor: default;
+        opacity: 0.6;
+      }
+
+      button.primary:focus-visible {
+        outline: 2px solid var(--ink);
+        outline-offset: 3px;
+      }
+
+      .link-button {
+        display: block;
+        width: 100%;
+        margin-top: 12px;
+        padding: 12px;
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        background: transparent;
+        color: var(--ink-soft);
+        font: inherit;
+        font-size: 14px;
+        text-align: center;
+        text-decoration: none;
+        cursor: pointer;
+      }
+
+      .link-button:hover {
+        background: var(--celadon-mist);
+      }
+
+      .status {
+        display: none;
+      }
+
+      .status.is-visible {
+        display: block;
+      }
+
+      .check {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 52px;
+        height: 52px;
+        margin-bottom: 16px;
+        border-radius: 50%;
+        background: var(--celadon-mist);
+        color: var(--celadon-deep);
+        font-size: 26px;
+      }
+
+      .fineprint {
+        margin-top: 18px;
+        color: var(--ink-faint);
+        font-size: 12px;
+        line-height: 1.7;
+        text-align: center;
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        * {
+          transition: none !important;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <div class="brand"><span class="seal">心</span><span>心意管家</span></div>
+
+      <section class="card">
+        <div id="loading" class="status is-visible">
+          <h1>正在打开重置链接…</h1>
+          <p class="lead">请稍候，马上就好。</p>
+        </div>
+
+        <form id="form" class="status" novalidate>
+          <h1>设置新密码</h1>
+          <p class="lead">为了账号安全，请设置一个新密码。设置成功后，回到 App 用新密码登录即可。</p>
+
+          <div id="error" class="error" role="alert"></div>
+
+          <div class="field">
+            <label for="password">新密码</label>
+            <div class="input-wrap">
+              <input
+                id="password"
+                name="password"
+                type="password"
+                autocomplete="new-password"
+                inputmode="text"
+                placeholder="至少 6 位"
+                required
+                minlength="6"
+                maxlength="72"
+              />
+              <button type="button" class="toggle" data-toggle="password" aria-label="显示新密码">显示</button>
+            </div>
+          </div>
+
+          <div class="field">
+            <label for="confirm">再次输入新密码</label>
+            <div class="input-wrap">
+              <input
+                id="confirm"
+                name="confirm"
+                type="password"
+                autocomplete="new-password"
+                inputmode="text"
+                placeholder="再次输入"
+                required
+                minlength="6"
+                maxlength="72"
+              />
+              <button type="button" class="toggle" data-toggle="confirm" aria-label="显示确认密码">显示</button>
+            </div>
+          </div>
+
+          <p class="hint">密码至少 6 位，建议混合字母与数字。</p>
+
+          <div class="actions">
+            <button id="submit" class="primary" type="submit">保存新密码</button>
+          </div>
+        </form>
+
+        <div id="success" class="status">
+          <div class="check" aria-hidden="true">✓</div>
+          <h1>密码已重置</h1>
+          <p class="lead">请回到 App，使用新密码登录。如果暂时没有自动打开 App，可以点下面的按钮。</p>
+          <a class="link-button" href="aixinyiguanjia://auth/login">打开 App 登录</a>
+        </div>
+
+        <div id="failure" class="status">
+          <h1 id="failure-title">链接无法使用</h1>
+          <p id="failure-text" class="lead">
+            重置链接可能已过期或已被使用。请回到 App 的「找回密码」重新发送邮件。
+          </p>
+          <a class="link-button" href="aixinyiguanjia://auth/forgot-password">回到 App 重新发送</a>
+        </div>
+      </section>
+
+      <p class="fineprint">本页面只用于重置「心意管家」账号密码，不会保存你的密码。</p>
+    </main>
+
+    <script>
+      (function () {
+        'use strict';
+
+        var SUPABASE_URL = 'https://vcrhtxtjnjewmcfgeyny.supabase.co';
+        var SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZjcmh0eHRqbmpld21jZmdleW55Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTMwMTM5ODMsImV4cCI6MjEwODU4OTk4M30.-gO18IKU_gG5zssw_kLAfjNmdXSRIZbH_I6nFmq_zjg';
+
+        var loadingView = document.getElementById('loading');
+        var formView = document.getElementById('form');
+        var successView = document.getElementById('success');
+        var failureView = document.getElementById('failure');
+        var failureTitle = document.getElementById('failure-title');
+        var failureText = document.getElementById('failure-text');
+        var errorBox = document.getElementById('error');
+        var form = document.getElementById('form');
+        var passwordInput = document.getElementById('password');
+        var confirmInput = document.getElementById('confirm');
+        var submitButton = document.getElementById('submit');
+
+        /** 当前可用的 access token；只保存在内存中，不写 localStorage。 */
+        var accessToken = null;
+        var submitting = false;
+
+        function show(view) {
+          [loadingView, formView, successView, failureView].forEach(function (node) {
+            node.classList.toggle('is-visible', node === view);
+          });
+        }
+
+        function showError(message) {
+          errorBox.textContent = message;
+          errorBox.classList.add('is-visible');
+        }
+
+        function clearError() {
+          errorBox.textContent = '';
+          errorBox.classList.remove('is-visible');
+          passwordInput.removeAttribute('aria-invalid');
+          confirmInput.removeAttribute('aria-invalid');
+        }
+
+        function showFailure(title, message) {
+          failureTitle.textContent = title;
+          failureText.textContent = message;
+          show(failureView);
+        }
+
+        /** 同时解析 query 与 hash；hash 优先。 */
+        function readParams() {
+          var params = {};
+          var raw = [];
+
+          if (window.location.search) {
+            raw.push(window.location.search.slice(1));
+          }
+          if (window.location.hash) {
+            raw.push(window.location.hash.slice(1));
+          }
+
+          raw.forEach(function (part) {
+            part.split('&').forEach(function (pair) {
+              if (!pair) {
+                return;
+              }
+              var index = pair.indexOf('=');
+              var key = index >= 0 ? pair.slice(0, index) : pair;
+              var value = index >= 0 ? pair.slice(index + 1) : '';
+              try {
+                params[decodeURIComponent(key)] = decodeURIComponent(value.replace(/\+/g, ' '));
+              } catch (error) {
+                params[key] = value;
+              }
+            });
+          });
+
+          return params;
+        }
+
+        function isConfigured() {
+          return (
+            typeof SUPABASE_URL === 'string' &&
+            SUPABASE_URL.indexOf('http') === 0 &&
+            typeof SUPABASE_ANON_KEY === 'string' &&
+            SUPABASE_ANON_KEY.length > 20 &&
+            SUPABASE_URL.indexOf('__') !== 0 &&
+            SUPABASE_ANON_KEY.indexOf('__') !== 0
+          );
+        }
+
+        function apiHeaders(token) {
+          var headers = {
+            'Content-Type': 'application/json',
+            apikey: SUPABASE_ANON_KEY,
+            'X-Client-Info': 'xinyi-reset-page/1.0',
+          };
+          if (token) {
+            headers.Authorization = 'Bearer ' + token;
+          }
+          return headers;
+        }
+
+        function errorMessage(payload, fallback) {
+          if (!payload || typeof payload !== 'object') {
+            return fallback;
+          }
+          return payload.msg || payload.message || payload.error_description || fallback;
+        }
+
+        async function readJson(response) {
+          try {
+            return await response.json();
+          } catch (error) {
+            return null;
+          }
+        }
+
+        /** 用链接里的 token 换取恢复会话；返回 access token。 */
+        async function resolveAccessToken(params) {
+          if (params.error_description || params.error) {
+            throw {
+              kind: 'invalid',
+              message: params.error_description || '重置链接无效，请重新发送邮件。',
+            };
+          }
+
+          if (params.access_token) {
+            if (params.type && params.type !== 'recovery') {
+              throw { kind: 'invalid', message: '这不是密码重置链接，请重新发送重置邮件。' };
+            }
+            return params.access_token;
+          }
+
+          if (params.token_hash || params.token) {
+            var verifyBody = { type: 'recovery' };
+            if (params.token_hash) {
+              verifyBody.token_hash = params.token_hash;
+            } else {
+              verifyBody.token = params.token;
+            }
+
+            var verifyResponse = await fetch(SUPABASE_URL + '/auth/v1/verify', {
+              method: 'POST',
+              headers: apiHeaders(),
+              body: JSON.stringify(verifyBody),
+            });
+            var session = await readJson(verifyResponse);
+
+            if (!verifyResponse.ok || !session || !session.access_token) {
+              throw {
+                kind: 'invalid',
+                message: errorMessage(session, '重置链接已失效，请重新发送邮件。'),
+              };
+            }
+            return session.access_token;
+          }
+
+          if (params.code) {
+            // PKCE 的 code 需要发起请求时的 code_verifier，浏览器页面无法取得。
+            throw {
+              kind: 'invalid',
+              message: '请回到 App 的「找回密码」重新发送邮件，再点击邮件里的新链接。',
+            };
+          }
+
+          throw { kind: 'invalid', message: '链接缺少重置凭证，请重新发送邮件。' };
+        }
+
+        function validate() {
+          clearError();
+          var password = passwordInput.value;
+          var confirm = confirmInput.value;
+
+          if (password.length < 6) {
+            passwordInput.setAttribute('aria-invalid', 'true');
+            showError('密码至少需要 6 位。');
+            passwordInput.focus();
+            return null;
+          }
+          if (password.length > 72) {
+            passwordInput.setAttribute('aria-invalid', 'true');
+            showError('密码不能超过 72 位。');
+            passwordInput.focus();
+            return null;
+          }
+          if (password !== confirm) {
+            confirmInput.setAttribute('aria-invalid', 'true');
+            showError('两次输入的密码不一致。');
+            confirmInput.focus();
+            return null;
+          }
+          return password;
+        }
+
+        async function submit(event) {
+          event.preventDefault();
+          if (submitting) {
+            return;
+          }
+
+          var password = validate();
+          if (!password) {
+            return;
+          }
+
+          submitting = true;
+          submitButton.disabled = true;
+          submitButton.textContent = '正在保存…';
+
+          try {
+            var response = await fetch(SUPABASE_URL + '/auth/v1/user', {
+              method: 'PUT',
+              headers: apiHeaders(accessToken),
+              body: JSON.stringify({ password: password }),
+            });
+            var payload = await readJson(response);
+
+            if (!response.ok) {
+              var message = errorMessage(payload, '密码重置失败，请稍后重试。');
+              if (response.status === 401 || response.status === 403) {
+                showFailure('链接已失效', '重置链接已过期或已被使用，请回到 App 重新发送邮件。');
+                return;
+              }
+              showError(message);
+              return;
+            }
+
+            // 成功后清掉地址栏里的凭证，避免被复制或留在浏览器历史里。
+            if (window.history && window.history.replaceState) {
+              window.history.replaceState(null, '', window.location.pathname);
+            }
+            passwordInput.value = '';
+            confirmInput.value = '';
+            accessToken = null;
+            show(successView);
+          } catch (error) {
+            showError('网络连接失败，请检查网络后重试。');
+          } finally {
+            submitting = false;
+            submitButton.disabled = false;
+            submitButton.textContent = '保存新密码';
+          }
+        }
+
+        function bindToggles() {
+          var toggles = document.querySelectorAll('[data-toggle]');
+          Array.prototype.forEach.call(toggles, function (button) {
+            button.addEventListener('click', function () {
+              var input = document.getElementById(button.getAttribute('data-toggle'));
+              var visible = input.type === 'text';
+              input.type = visible ? 'password' : 'text';
+              button.textContent = visible ? '显示' : '隐藏';
+              button.setAttribute('aria-label', (visible ? '显示' : '隐藏') + '密码');
+            });
+          });
+        }
+
+        async function init() {
+          bindToggles();
+          form.addEventListener('submit', submit);
+
+          if (!isConfigured()) {
+            showFailure('页面尚未配置', '请联系开发者完成重置页部署配置。');
+            return;
+          }
+
+          var params = readParams();
+          if (!params.access_token && !params.token_hash && !params.token && !params.code) {
+            if (params.error_description || params.error) {
+              showFailure('链接无法使用', params.error_description || '重置链接无效，请重新发送邮件。');
+              return;
+            }
+            showFailure(
+              '链接不完整',
+              '请直接点击邮件里的重置链接；如果问题仍在，请回到 App 重新发送邮件。',
+            );
+            return;
+          }
+
+          try {
+            accessToken = await resolveAccessToken(params);
+            show(formView);
+            passwordInput.focus();
+          } catch (error) {
+            if (error && error.kind === 'invalid') {
+              showFailure('链接无法使用', error.message);
+              return;
+            }
+            showFailure('暂时无法验证链接', '请检查网络后刷新页面；如果仍然失败，请重新发送邮件。');
+          }
+        }
+
+        init();
+      })();
+    </script>
+  </body>
+</html>
